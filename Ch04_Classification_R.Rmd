@@ -225,14 +225,44 @@ Q1. What metric will you use? Why?
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+glm_fit <- glm(SURVIVED_bin~AGE_TRUNK+SEX,family=binomial,data= Train_COVID)
+
+logit_P = predict(glm_fit,Test_COVID,type="response")
+logit_Pred <- ifelse(logit_P > 0.5,1,0)
+conf_matrix= table(Test_COVID$SURVIVED_bin, logit_Pred)
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+precision <- conf_matrix[2, 2] / sum(conf_matrix[, 2])
+
+sensitivity <- conf_matrix[2, 2] / sum(conf_matrix[2, ])
+
+specificity <- conf_matrix[1, 1] / sum(conf_matrix[1, ])
+
+print(paste("Accuracy:", accuracy))
+print(paste("Precision:", precision))
+print(paste("Sensitivity:", sensitivity))
+print(paste("Specificity:", specificity))
+```
+
+
+```{r,echo=TRUE}
+roc_score=roc(Test_COVID$SURVIVED_bin, logit_P)
+plot(roc_score ,main ="ROC curve -- Logistic Regression ")
 ```
 
 Your answer:
 
 ~~~
 Please write your answer in full sentences.
+(1)
+Accuracy: 0.924129737889355
+Precision: 0.930201734347746
+Sensitivity: 0.992606314551402
+Specificity: 0.0588541279631419
+
+(2)
+ROC and AUC
 
 
 ~~~
@@ -241,8 +271,8 @@ Q2. What was your best performing model?
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+glm_fit <- glm(SURVIVED_bin~AGE_TRUNK+SEX,family=binomial,data= Train_COVID)
+glm_fit$converged
 ```
 
 Your answer:
@@ -258,8 +288,7 @@ Q3. Explain how you got the model in detail.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+M <-cor(Covid_Data[,c("FEMALE", "AGE_TRUNK", "SURVIVED_bin")],use="pairwise.complete.obs")
 ```
 
 Your answer:
@@ -274,8 +303,7 @@ Q4. Based on your model, what factor seems to be important in deciding if a pati
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+summary(glm_fit)
 ```
 
 Your answer:
@@ -283,6 +311,7 @@ Your answer:
 ~~~
 Please write your answer in full sentences.
 
+Based on MY model, the factor "SEX" seems to be important in deciding if a patient survives or not.
 
 ~~~
 
@@ -296,8 +325,13 @@ In this problem, you will develop a model to predict whether a given car gets hi
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+# install.packages("ISLR")
+library(ISLR)
+# View(Auto)
+mpg_median <- median(Auto$mpg)
+Auto$mpg01 <- ifelse(Auto$mpg > mpg_median, 1, 0)
+colnames(Auto)
+
 ```
 
 Your answer:
@@ -311,12 +345,54 @@ Please write your answer in full sentences.
 
 (b) Explore the data graphically in order to investigate the association between `mpg01` and the other features. Which other features seem most likely to be useful in predicting `mpg01`? Scatterplots and boxplots may be useful tools to answer this question. Describe your findings.
 
+```{r}
+par(mfrow = c(2, 3)) # Set up a 2x3 grid for plotting
+
+plot(Auto$mpg01, Auto$cylinders, xlab = "mpg01", ylab = "Cylinders", main = "Cylinders vs. mpg01", pch = 19)
+plot(Auto$mpg01, Auto$displacement, xlab = "mpg01", ylab = "Displacement", main = "Displacement vs. mpg01", pch = 19)
+plot(Auto$mpg01, Auto$horsepower, xlab = "mpg01", ylab = "Horsepower", main = "Horsepower vs. mpg01", pch = 19)
+plot(Auto$mpg01, Auto$weight, xlab = "mpg01", ylab = "Weight", main = "Weight vs. mpg01", pch = 19)
+plot(Auto$mpg01, Auto$acceleration, xlab = "mpg01", ylab = "Acceleration", main = "Acceleration vs. mpg01", pch = 19)
+
+boxplot(mpg01 ~ origin, data = Auto, xlab = "Origin", ylab = "mpg01", main = "Boxplot of mpg01 by Origin")
+
+par(mfrow = c(1, 1))
+
+
+M <-cor(Auto[,c("mpg01", "cylinders","displacement","horsepower", "weight","acceleration","year","origin")],use="pairwise.complete.obs")
+corrplot(M, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+
+M
+```
+
+Based on the correlation matrix provided (M), we can observe the correlations between mpg01 and other features. The absolute values of the correlation coefficients indicate the strength and direction of the linear relationship between variables.
+Here are the absolute correlation coefficients between mpg01 and the other features:
+Cylinders: 0.7591939
+Displacement: 0.7534766
+Horsepower: 0.6670526
+Weight: 0.7577566
+Acceleration: 0.3468215
+Year: 0.4299042
+Origin: 0.5136984
+Features with higher absolute correlation coefficients with mpg01 are more likely to be useful in predicting mpg01. From the correlation matrix, we see that cylinders, displacement, weight have relatively higher absolute correlation coefficients with mpg01. These features seem to have stronger associations with the binary variable mpg01 and are therefore more likely to be useful in predicting it.
+Therefore, the features most likely to be useful in predicting mpg01 based on the correlation coefficients are:
+(1) Cylinders
+(2) Displacement
+(3) Weight
+
+
+
 (c) Split the data into a training set and a test set.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+size<-floor(dim(Auto)[1]*0.3)
+set.seed(1257)
+samp_idx<-sample(1:dim(Auto)[1],size,FALSE)
+train_set<- Auto[samp_idx,]
+test_set <- Auto[-samp_idx,]
+
 ```
 
 Your answer:
@@ -332,9 +408,20 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(MASS)
+lda_model <- lda(mpg01 ~ cylinders + displacement + weight, data = train_set)
+lda_pred <- predict(lda_model, newdata = test_set)
+predicted_classes <- lda_pred$class
+test_error1 <- mean(predicted_classes != test_set$mpg01)
+print(paste("Test error for LDA model:", test_error1))
 ```
+
+Test error for LDA model: 0.0981818181818182
+
+
+
+
+
 
 Your answer:
 
@@ -349,8 +436,12 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(MASS)
+qda_model <- qda(mpg01 ~ cylinders + displacement + weight, data = train_set)
+predicted_mpg01 <- predict(qda_model, newdata = test_set)
+test_error2 <- mean(predicted_mpg01$class != test_set$mpg01)
+print(paste("Test error for QDA model:", test_error2))
+
 ```
 
 Your answer:
@@ -358,7 +449,7 @@ Your answer:
 ~~~
 Please write your answer in full sentences.
 
-
+Test error for QDA model: 0.0981818181818182
 ~~~
 
 
@@ -366,8 +457,27 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+glm_fit1<- glm(mpg01 ~ cylinders + displacement + weight, family=binomial,data= train_set)
+summary(glm_fit1)
+glm_fit1$converged
+
+glm_fit2<- glm(mpg01 ~ weight, family=binomial,data= train_set)
+summary(glm_fit2)
+glm_fit2$converged
+
+
+glm_fit1_pred <- predict(glm_fit1, newdata = test_set, type = "response")
+glm_fit2_pred <- predict(glm_fit2, newdata = test_set, type = "response")
+
+glm_fit1_pred_binary <- ifelse(glm_fit1_pred > 0.5, 1, 0)
+glm_fit2_pred_binary <- ifelse(glm_fit2_pred > 0.5, 1, 0)
+
+test_error_glm_fit1 <- mean(glm_fit1_pred_binary != test_set$mpg01)
+test_error_glm_fit2 <- mean(glm_fit2_pred_binary != test_set$mpg01)
+
+print(paste("Test error for glm_fit1:", test_error_glm_fit1))
+print(paste("Test error for glm_fit2:", test_error_glm_fit2))
+
 ```
 
 Your answer:
@@ -375,7 +485,9 @@ Your answer:
 ~~~
 Please write your answer in full sentences.
 
+Test error for glm_fit1: 0.101818181818182
 
+Test error for glm_fit2: 0.105454545454545
 ~~~
 
 
@@ -383,8 +495,19 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(e1071)
+nb_model <- naiveBayes(mpg01 ~ cylinders + displacement + weight, data = train_set)
+
+predictions <- predict(nb_model, test_set)
+
+conf_matrix <- table(predictions, test_set$mpg01)
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+test_error <- 1 - accuracy
+
+cat("Test Error:", test_error, "\n")
+
 ```
 
 Your answer:
@@ -392,7 +515,7 @@ Your answer:
 ~~~
 Please write your answer in full sentences.
 
-
+Test Error: 0.09090909
 ~~~
 
 
@@ -400,8 +523,29 @@ Please write your answer in full sentences.
 
 Your code:
 ```{r,echo=TRUE}
-#
-#
+library(class)
+
+predictors <- c("cylinders", "displacement", "weight")
+
+test_errors <- numeric()
+
+k_values <- c(1, 3, 5, 7, 9)
+
+for (k in k_values) {
+
+  knn_pred <- knn(train = train_set[, predictors], 
+                  test = test_set[, predictors], 
+                  cl = train_set$mpg01, 
+                  k = k)
+  error <- mean(knn_pred != test_set$mpg01)
+
+  test_errors <- c(test_errors, error)
+}
+
+for (i in seq_along(k_values)) {
+  cat("K =", k_values[i], "Test Error =", test_errors[i], "\n")
+}
+
 ```
 
 Your answer:
@@ -409,6 +553,13 @@ Your answer:
 ~~~
 Please write your answer in full sentences.
 
+K = 1 Test Error = 0.1454545 
+K = 3 Test Error = 0.1018182 
+K = 5 Test Error = 0.1018182 
+K = 7 Test Error = 0.1090909 
+K = 9 Test Error = 0.1054545 
+
+The value of K = 3 or 5  seems to perform the best on this data set.
 
 ~~~
 
